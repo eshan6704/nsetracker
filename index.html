@@ -1,270 +1,505 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NSE Stock Tracker by Eshan Patel</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: #f5f5f5;
-        }
-        header, footer {
-            background: #1e3a8a;
-            color: white;
-            padding: 15px;
-            text-align: center;
-            font-size: 20px;
-            font-weight: bold;
-        }
-        .container {
-            width: 95%;
-            margin: 10px auto;
-        }
-        .row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        input[type="text"] {
-            flex: 1;
-            padding: 8px;
-            font-size: 16px;
-        }
-        button {
-            padding: 8px 16px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        .status {
-            flex: 1;
-            background: #e0e7ff;
-            padding: 8px;
-            border-radius: 4px;
-        }
-        /* Tabs */
-        .tabs {
-            display: flex;
-            background: #cbd5e1;
-            border-radius: 6px;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-        .tab {
-            flex: 1;
-            padding: 10px;
-            text-align: center;
-            cursor: pointer;
-            background: #e2e8f0;
-            font-weight: bold;
-        }
-        .tab.active {
-            background: white;
-            border-bottom: 3px solid #1e3a8a;
-        }
-        .tab-content {
-            background: white;
-            padding: 12px;
-            border-radius: 6px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-        }
-        .json-box, .table-content {
-            height: 150px;
-            border: 1px dashed #999;
-            padding: 10px;
-            background: #fafafa;
-            overflow-y: auto;
-            border-radius: 4px;
-            font-family: monospace;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: #666;
-        }
-    </style>
-    <script>
-        function showTab(tabName) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+<meta charset="UTF-8" />
+<title>NSE Stock Tracker by Eshan Patel</title>
+<style>
+    body { margin:0; font-family: Arial; height:100vh; display:flex; flex-direction:column; background:#0b1220; color:#ddd; }
+    header, footer { background:#0f1720; color:#fff; padding:10px; text-align:center; position:sticky; z-index:10; }
+    header { top:0; }
+    footer { bottom:0; }
+    #content { flex:1; overflow:auto; padding:12px; }
+    .row { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+    .tabBar { display:flex; gap:10px; margin-bottom:10px; }
+    .tab { padding:8px 12px; background:#222; cursor:pointer; border-radius:4px; color:#ddd; }
+    .tab.active { background:#0b75d1; color:white; }
+    .section { display:none; }
+    .section.active { display:block; }
+    table { width:100%; border-collapse:collapse; margin-bottom:20px; background:#071020; color:#ddd; }
+    th, td { border:1px solid #223; padding:6px; text-align:left; }
+    pre { background:#000; color:#0f0; padding:10px; overflow:auto; height:300px; }
 
-            document.getElementById(tabName).style.display = 'block';
-            document.getElementById('tab-' + tabName).classList.add('active');
-        }
+    /* NEW: scrollable tables */
+    .scrollBox { 
+        max-height:400px;
+        overflow:auto;
+        border:1px solid #223;
+        margin-bottom:20px;
+        background:#071020;
+        padding:6px;
+    }
 
-        window.onload = () => {
-            showTab('debug');
-        };
-            function fetchSample() {
-            const sample = {
-                info: {symbol: "RELIANCE", name: "Reliance Industries", sector: "Energy"},
-                daily: [
-                    {date: "2025-11-14", open: 2510, close: 2532},
-                    {date: "2025-11-15", open: 2532, close: 2540}
-                ],
-                intraday: [
-                    {time: "10:00", price: 2530},
-                    {time: "10:05", price: 2533}
-                ],
-                balance: [
-                    {year: 2023, assets: 100000, liabilities: 45000}
-                ],
-                cashflow: [
-                    {year: 2023, operating: 23000, investing: -12000}
-                ]
-            };
-
-            document.querySelector('.json-box').textContent = JSON.stringify(sample, null, 4);
-            document.querySelector('.status').textContent = "Status: Loaded sample JSON";
-        }
-
-        window.onload = () => showTab('debug');
-            function renderTables(data) {
-            // INFO TABLE
-            let infoHTML = `<table border='1' width='100%' cellpadding='5'>
-                <tr><th>Key</th><th>Value</th></tr>`;
-            for (let k in data.info) infoHTML += `<tr><td>${k}</td><td>${data.info[k]}</td></tr>`;
-            infoHTML += `</table>`;
-            document.getElementById('info-table').innerHTML = infoHTML;
-
-            // DAILY TABLE
-            let dailyHTML = `<table border='1' width='100%' cellpadding='5'><tr>`;
-            Object.keys(data.daily[0]).forEach(h => dailyHTML += `<th>${h}</th>`);
-            dailyHTML += `</tr>`;
-            data.daily.forEach(r => {
-                dailyHTML += `<tr>`;
-                Object.values(r).forEach(v => dailyHTML += `<td>${v}</td>`);
-                dailyHTML += `</tr>`;
-            });
-            dailyHTML += `</table>`;
-            document.getElementById('daily-table').innerHTML = dailyHTML;
-
-            // INTRADAY TABLE
-            let intraHTML = `<table border='1' width='100%' cellpadding='5'><tr>`;
-            Object.keys(data.intraday[0]).forEach(h => intraHTML += `<th>${h}</th>`);
-            intraHTML += `</tr>`;
-            data.intraday.forEach(r => {
-                intraHTML += `<tr>`;
-                Object.values(r).forEach(v => intraHTML += `<td>${v}</td>`);
-                intraHTML += `</tr>`;
-            });
-            intraHTML += `</table>`;
-            document.getElementById('intraday-table').innerHTML = intraHTML;
-
-            // BALANCE
-            let balHTML = `<table border='1' width='100%' cellpadding='5'><tr>`;
-            Object.keys(data.balance[0]).forEach(h => balHTML += `<th>${h}</th>`);
-            balHTML += `</tr>`;
-            data.balance.forEach(r => {
-                balHTML += `<tr>`;
-                Object.values(r).forEach(v => balHTML += `<td>${v}</td>`);
-                balHTML += `</tr>`;
-            });
-            document.getElementById('balance-table').innerHTML = balHTML;
-
-            // CASHFLOW
-            let cfHTML = `<table border='1' width='100%' cellpadding='5'><tr>`;
-            Object.keys(data.cashflow[0]).forEach(h => cfHTML += `<th>${h}</th>`);
-            cfHTML += `</tr>`;
-            data.cashflow.forEach(r => {
-                cfHTML += `<tr>`;
-                Object.values(r).forEach(v => cfHTML += `<td>${v}</td>`);
-                cfHTML += `</tr>`;
-            });
-            document.getElementById('cashflow-table').innerHTML = cfHTML;
-        }
-
-        function fetchSample() {
-            const sample = {
-                info: {symbol: "RELIANCE", name: "Reliance Industries", sector: "Energy"},
-                daily: [
-                    {date: "2025-11-14", open: 2510, close: 2532},
-                    {date: "2025-11-15", open: 2532, close: 2540}
-                ],
-                intraday: [
-                    {time: "10:00", price: 2530},
-                    {time: "10:05", price: 2533}
-                ],
-                balance: [
-                    {year: 2023, assets: 100000, liabilities: 45000}
-                ],
-                cashflow: [
-                    {year: 2023, operating: 23000, investing: -12000}
-                ]
-            };
-
-            document.querySelector('.json-box').textContent = JSON.stringify(sample, null, 4);
-            document.querySelector('.status').textContent = "Status: Loaded sample JSON";
-
-            renderTables(sample);
-        }
-    </script>
+    select[multiple] { height:100px; }
+    canvas { width:100%; background:#071020; border:1px solid #223; display:block; }
+    .controls { display:flex; gap:8px; align-items:center; }
+    input, select, button { padding:6px; border-radius:4px; border:1px solid #334; background:#0b1622; color:#ddd; }
+    button { cursor:pointer; background:#0b75d1; border:none; color:white; }
+</style>
 </head>
 <body>
 
-<header>NSE Stock Tracker by Eshan Patel</header>
+<header>
+  <h2>NSE Stock Tracker by Eshan Patel</h2>
+</header>
 
-<div class="container">
-    <div class="row">
-        <input type="text" placeholder="Enter Stock Symbol (e.g. RELIANCE)">
-        <button onclick="fetchSample()">Fetch</button>
-        <div class="status">Status: Waiting...</div>
-    </div>
+<div id="content">
 
-    <!-- Tab Buttons -->
-    <div class="tabs">
-        <div class="tab active" id="tab-debug" onclick="showTab('debug')">Debug</div>
-        <div class="tab" id="tab-info" onclick="showTab('info')">Info</div>
-        <div class="tab" id="tab-daily" onclick="showTab('daily')">Daily</div>
-        <div class="tab" id="tab-intraday" onclick="showTab('intraday')">Intraday</div>
-        <div class="tab" id="tab-balance" onclick="showTab('balance')">Balance Sheet</div>
-        <div class="tab" id="tab-cashflow" onclick="showTab('cashflow')">Cashflow</div>
-    </div>
+  <!-- SYMBOL + START/END + FETCH -->
+  <div class="row">
+      <input id="symbol" placeholder="Symbol" style="flex:1;">
+      <input id="startDate" placeholder="Start (dd-mm-yyyy)" style="flex:1;">
+      <input id="endDate" placeholder="End (dd-mm-yyyy)" style="flex:1;">
+      <button id="fetchBtn">Fetch</button>
+      <div id="statusBox" style="flex:1; text-align:center;">Status: Idle</div>
+  </div>
 
-    <!-- Tab Contents -->
-    <div class="tab-content" id="debug">
-        <div class="json-box">{
-    "info": {"symbol": "RELIANCE", "name": "Reliance Industries", "sector": "Energy"},
-    "daily": [
-        {"date": "2025-11-14", "open": 2510, "close": 2532},
-        {"date": "2025-11-15", "open": 2532, "close": 2540}
-    ],
-    "intraday": [
-        {"time": "10:00", "price": 2530},
-        {"time": "10:05", "price": 2533}
-    ],
-    "balance": [
-        {"year": 2023, "assets": 100000, "liabilities": 45000}
-    ],
-    "cashflow": [
-        {"year": 2023, "operating": 23000, "investing": -12000}
-    ]
-}...</div>
-    </div>
+  <!-- TABS -->
+  <div class="tabBar">
+      <div class="tab active" data-tab="debugTab">Debug</div>
+      <div class="tab" data-tab="infoTab">Info</div>
+      <div class="tab" data-tab="resultsTab">Results</div>
+      <div class="tab" data-tab="balanceTab">Balance Sheet</div>
+      <div class="tab" data-tab="cashflowTab">Cashflow</div>
+      <div class="tab" data-tab="dailyTab">Daily</div>
+      <div class="tab" data-tab="intradayTab">Intraday</div>
+  </div>
 
-    <div class="tab-content" id="info" style="display:none;">
-        <div class="table-placeholder"><div id='info-table'>No data</div>...</div>
-    </div>
+  <!-- SECTIONS -->
+  <div id="debugTab" class="section active">
+      <pre id="debugBox">(empty)</pre>
+  </div>
 
-    <div class="tab-content" id="daily" style="display:none;">
-        <div class="table-placeholder"><div id='daily-table'>No data</div>...</div>
-    </div>
+  <div id="infoTab" class="section"><div id="info"></div></div>
+  <div id="resultsTab" class="section"><div id="results"></div></div>
+  <div id="balanceTab" class="section"><div id="balance"></div></div>
+  <div id="cashflowTab" class="section"><div id="cashflow"></div></div>
 
-    <div class="tab-content" id="intraday" style="display:none;">
-        <div class="table-placeholder"><div id='intraday-table'>No data</div>...</div>
-    </div>
+  <!-- DAILY SECTION -->
+  <div id="dailyTab" class="section">
+      <div class="row controls">
+          <select id="dailyChartType">
+              <option value="line">Line</option>
+              <option value="candlestick">Candlestick</option>
+          </select>
 
-    <div class="tab-content" id="balance" style="display:none;">
-        <div class="table-placeholder"><div id='balance-table'>No data</div>...</div>
-    </div>
+          <!-- multi-select indicator -->
+          <select id="dailyIndicator" multiple>
+              <option value="sma">SMA (14)</option>
+              <option value="ema">EMA (14)</option>
+              <option value="rsi">RSI (14)</option>
+              <option value="macd">MACD (12,26,9)</option>
+          </select>
 
-    <div class="tab-content" id="cashflow" style="display:none;">
-        <div class="table-placeholder"><div id='cashflow-table'>No data</div>...</div>
-    </div>
+          <button id="applyDaily">Apply</button>
+          <button id="resetDaily">Reset Zoom</button>
+      </div>
+
+      <div style="height:380px;">
+        <canvas id="dailyChart"></canvas>
+      </div>
+
+      <div class="scrollBox">
+          <div id="daily"></div>
+      </div>
+  </div>
+
+  <!-- INTRADAY -->
+  <div id="intradayTab" class="section">
+      <div class="row controls">
+          <select id="intradayChartType">
+              <option value="line">Line</option>
+              <option value="candlestick">Candlestick</option>
+          </select>
+
+          <select id="intradayIndicator" multiple>
+              <option value="sma">SMA (14)</option>
+              <option value="ema">EMA (14)</option>
+              <option value="rsi">RSI (14)</option>
+              <option value="macd">MACD (12,26,9)</option>
+          </select>
+
+          <button id="applyIntra">Apply</button>
+          <button id="resetIntra">Reset Zoom</button>
+      </div>
+
+      <div style="height:380px;">
+        <canvas id="intradayChart"></canvas>
+      </div>
+
+      <div class="scrollBox">
+          <div id="intraday"></div>
+      </div>
+  </div>
+
 </div>
 
-<footer>© 2025 Eshan Patel | Static Layout</footer>
+<footer>
+  <p>© 2025 Eshan Patel</p>
+</footer>
+
+<!-- External libs -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.0.0/dist/chartjs-chart-financial.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.3.1/dist/chartjs-plugin-zoom.min.js"></script>
+
+<!-- TechnicalIndicators ESM: inject to window.ti -->
+<script type="module">
+import * as ti from "https://cdn.jsdelivr.net/npm/technicalindicators@3.1.0/dist/browser.esm.min.js";
+window.ti = ti;
+console.log("Technical Indicators Loaded", ti);
+</script>
+
+<!-- YOUR FETCH MODULE (keeps your existing api.js) -->
+<script type="module">
+import { fetchStockData } from "./api.js";
+
+/* -------------------------
+   UI TAB SWITCHING
+   ------------------------- */
+document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", (ev) => {
+        const id = ev.currentTarget.dataset.tab;
+        document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+        document.getElementById(id).classList.add("active");
+        document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+        ev.currentTarget.classList.add("active");
+    });
+});
+
+/* Simple table helpers */
+function tableFromObject(obj) {
+    if (!obj) return "No data";
+    let html = "<table>";
+    for (let k in obj) html += `<tr><th>${k}</th><td>${String(obj[k])}</td></tr>`;
+    return html + "</table>";
+}
+
+function tableFromArray(arr) {
+    if (!arr || arr.length === 0) return "No data";
+    let keys = Object.keys(arr[0]);
+    let html = "<table><tr>";
+    keys.forEach(k => html += `<th>${k}</th>`);
+    html += "</tr>";
+    arr.forEach(row => {
+        html += "<tr>";
+        keys.forEach(k => html += `<td>${String(row[k] ?? "")}</td>`);
+        html += "</tr>";
+    });
+    return html + "</table>";
+}
+
+function pick(obj, keys) {
+    if (!obj) return null;
+    for (let k of keys) if (obj[k]) return obj[k];
+    return null;
+}
+
+/* Global storage */
+let globalDaily = [];
+let globalIntra = [];
+let dChart = null;
+let iChart = null;
+
+/* -------------------------
+   FETCH & POPULATE
+   ------------------------- */
+const fetchBtn = document.getElementById("fetchBtn");
+fetchBtn.addEventListener("click", fetchData);
+
+async function fetchData(){
+    const symbol = document.getElementById("symbol").value.trim();
+    if (!symbol) return alert("Enter symbol");
+    document.getElementById("statusBox").innerText = "Status: Fetching...";
+    try {
+        const data = await fetchStockData(symbol, "NSE");
+
+        // debug
+        document.getElementById("debugBox").textContent =
+            JSON.stringify({ keys: Object.keys(data || {}), data }, null, 2);
+
+        document.getElementById("statusBox").innerText = "Status: Success";
+
+        const info = pick(data, ["info", "info_data", "details"]);
+        document.getElementById("info").innerHTML = tableFromObject(info || {});
+
+        const qRes = pick(data.financials || {}, ["quarterly", "Quarterly"]);
+        const yRes = pick(data.financials || {}, ["yearly", "Yearly"]);
+        document.getElementById("results").innerHTML =
+            tableFromArray(qRes || []) + "<br>" + tableFromArray(yRes || []);
+
+        const bal = pick(data, ["balance_sheet", "balanceSheet"]);
+        document.getElementById("balance").innerHTML =
+            tableFromArray(bal?.quarterly || []) +
+            "<br>" +
+            tableFromArray(bal?.yearly || []);
+
+        const cash = pick(data, ["cashflow", "cashFlow"]);
+        document.getElementById("cashflow").innerHTML =
+            tableFromArray(cash?.quarterly || []) +
+            "<br>" +
+            tableFromArray(cash?.yearly || []);
+
+        // Normalize daily / intraday keys to commonly used names
+        globalDaily = pick(data, ["historical_daily", "daily_history", "daily"]) || [];
+        document.getElementById("daily").innerHTML = tableFromArray(globalDaily);
+
+        globalIntra = pick(data, ["intraday_5min", "intraday", "intraday_1m", "intraday_5min"]) || [];
+        document.getElementById("intraday").innerHTML = tableFromArray(globalIntra);
+
+    } catch (e) {
+        document.getElementById("statusBox").innerText = "Status: ERROR";
+        document.getElementById("debugBox").textContent = e.toString();
+    }
+}
+
+/* -------------------------
+   CHART UTILITIES
+   ------------------------- */
+
+/* Reset canvas element (replace node) and return new ctx */
+function resetCanvasCtx(canvasId){
+    const oldCanvas = document.getElementById(canvasId);
+    const newCanvas = oldCanvas.cloneNode(true);
+    oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+    return newCanvas.getContext("2d");
+}
+
+/* Compute indicators (supports multiple) */
+function computeIndicators(values, indicatorArr) {
+    const out = {};
+    indicatorArr.forEach(type => {
+        if (!type) return;
+        if (type === "sma") out.sma = window.ti.SMA.calculate({ period: 14, values });
+        if (type === "ema") out.ema = window.ti.EMA.calculate({ period: 14, values });
+        if (type === "rsi") out.rsi = window.ti.RSI.calculate({ period: 14, values });
+        if (type === "macd") {
+            const mac = window.ti.MACD.calculate({ fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, values });
+            out.macd = mac.map(x => x.histogram);
+        }
+    });
+    return out;
+}
+
+/* Pad indicator arrays to match labels length */
+function padIndicator(arr, targetLen) {
+    if (!arr) return Array(targetLen).fill(null);
+    const padLen = targetLen - arr.length;
+    if (padLen <= 0) return arr.slice(-targetLen);
+    return [...Array(padLen).fill(null), ...arr];
+}
+
+/* Build candlestick points with x labels */
+function buildCandlePoints(labels, opens, highs, lows, closes) {
+    return labels.map((lab, i) => ({
+        x: lab,
+        o: Number(opens[i]),
+        h: Number(highs[i]),
+        l: Number(lows[i]),
+        c: Number(closes[i])
+    }));
+}
+
+/* Create a nicely colored volume bar color depending on candle */
+function buildVolumeColors(opens, closes) {
+    return closes.map((c, i) => {
+        return Number(c) >= Number(opens[i]) ? "rgba(26,200,120,0.6)" : "rgba(255,80,80,0.6)";
+    });
+}
+
+/* -------------------------
+   MAIN ADVANCED RENDER
+   ------------------------- */
+function drawAdvancedChart(data, canvasId, chartType, selectedIndicatorsCsv) {
+    if (!data || data.length === 0) return;
+
+    // Ensure labels are strings (date/time)
+    const labels = data.map(x => (x.date || x.Date || x.datetime || x.time || x.t || "").toString());
+
+    // Extract numeric OHLC and volume (tolerant)
+    const opens = data.map(x => Number(x.open ?? x.Open ?? x.O ?? x.o ?? 0));
+    const highs = data.map(x => Number(x.high ?? x.High ?? x.H ?? x.h ?? 0));
+    const lows  = data.map(x => Number(x.low  ?? x.Low  ?? x.L ?? x.l ?? 0));
+    const closes= data.map(x => Number(x.close ?? x.Close ?? x.C ?? x.c ?? 0));
+    const volumes = data.map(x => Number(x.volume ?? x.Volume ?? x.V ?? 0));
+
+    // Compute indicators
+    const indicatorArr = selectedIndicatorsCsv ? selectedIndicatorsCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
+    const indicators = computeIndicators(closes, indicatorArr);
+
+    // Build datasets
+    const ctx = resetCanvasCtx(canvasId);
+
+    const datasets = [];
+
+    if (chartType === "candlestick") {
+        const candlePoints = buildCandlePoints(labels, opens, highs, lows, closes);
+        datasets.push({
+            label: "Price (candlestick)",
+            data: candlePoints,
+            type: "candlestick",
+            // the financial plugin will color candles automatically if options provided below
+        });
+    } else {
+        // Line chart using closes
+        datasets.push({
+            label: "Close",
+            data: labels.map((lab, i) => ({ x: lab, y: closes[i] })),
+            type: "line",
+            borderColor: "rgba(30,170,240,1)",
+            borderWidth: 1,
+            pointRadius: 0,
+            tension: 0
+        });
+    }
+
+    // Volume as bar on its own axis
+    datasets.push({
+        label: "Volume",
+        type: "bar",
+        data: labels.map((lab, i) => ({ x: lab, y: volumes[i] })),
+        backgroundColor: buildVolumeColors(opens, closes),
+        yAxisID: "vol",
+        order: 2
+    });
+
+    // Indicator datasets (align lengths by padding)
+    Object.keys(indicators).forEach(k => {
+        const raw = indicators[k];
+        const padded = padIndicator(raw, labels.length);
+        datasets.push({
+            label: k.toUpperCase(),
+            type: "line",
+            data: labels.map((lab, i) => ({ x: lab, y: padded[i] ?? null })),
+            borderWidth: 1,
+            pointRadius: 0,
+            tension: 0.1,
+            borderColor: {
+                sma: "gold",
+                ema: "cyan",
+                rsi: "orange",
+                macd: "magenta"
+            }[k] || "white",
+            yAxisID: "y"
+        });
+    });
+
+    // Destroy existing chart object reference if present
+    if (canvasId === "dailyChart" && dChart) {
+        try { dChart.destroy(); } catch(e){ }
+        dChart = null;
+    }
+    if (canvasId === "intradayChart" && iChart) {
+        try { iChart.destroy(); } catch(e){ }
+        iChart = null;
+    }
+
+    // Create chart
+    const createdChart = new Chart(ctx, {
+        type: (chartType === "candlestick" ? "candlestick" : "line"),
+        data: { datasets },
+        options: {
+            animation: false,
+            parsing: false,
+            normalized: true,
+            maintainAspectRatio: false,
+            responsive: true,
+            scales: {
+                x: {
+                    type: "category",
+                    labels: labels,
+                    ticks: { color: "#cfe8ff" },
+                    grid: { color: "#122" }
+                },
+                y: {
+                    position: "right",
+                    ticks: { color: "#cfe8ff" },
+                    grid: { color: "#122" },
+                    title: { display: false }
+                },
+                vol: {
+                    position: "left",
+                    display: true,
+                    grid: { display: false },
+                    ticks: { color: "#9fd" },
+                    title: { display: false },
+                    stacked: false
+                }
+            },
+            plugins: {
+                legend: { labels: { color: "#cfe8ff" } },
+                tooltip: {
+                    mode: "index",
+                    intersect: false
+                },
+                zoom: {
+                    pan: { enabled: true, mode: "x", modifierKey: "ctrl" },
+                    zoom: {
+                        wheel: { enabled: true },
+                        pinch: { enabled: true },
+                        mode: "x"
+                    }
+                }
+            }
+        }
+    });
+
+    if (canvasId === "dailyChart") dChart = createdChart;
+    else iChart = createdChart;
+
+    // Return chart for optional chaining
+    return createdChart;
+}
+
+/* -------------------------
+   UI Hooks for Apply / Reset
+   ------------------------- */
+function getSelectedOptionsCsv(selectElem) {
+    return Array.from(selectElem.selectedOptions).map(o => o.value).join(",");
+}
+
+/* Daily apply/reset */
+document.getElementById("applyDaily").addEventListener("click", () => {
+    const type = document.getElementById("dailyChartType").value;
+    const ind = getSelectedOptionsCsv(document.getElementById("dailyIndicator"));
+    drawAdvancedChart(globalDaily, "dailyChart", type, ind);
+});
+
+document.getElementById("resetDaily").addEventListener("click", () => {
+    if (dChart && dChart.resetZoom) dChart.resetZoom();
+});
+
+/* Intraday apply/reset */
+document.getElementById("applyIntra").addEventListener("click", () => {
+    const type = document.getElementById("intradayChartType").value;
+    const ind = getSelectedOptionsCsv(document.getElementById("intradayIndicator"));
+    drawAdvancedChart(globalIntra, "intradayChart", type, ind);
+});
+
+document.getElementById("resetIntra").addEventListener("click", () => {
+    if (iChart && iChart.resetZoom) iChart.resetZoom();
+});
+
+/* Optional: auto-draw after fetch (daily & intraday) */
+const observer = new MutationObserver(() => {
+    // small convenience: if data is loaded and chart area empty, try to draw default
+    // (but won't crash if no data)
+});
+observer.observe(document.getElementById("debugBox"), { childList: true });
+
+/* -------------------------
+   Handy keyboard: R to reset zoom on focused chart
+   ------------------------- */
+document.addEventListener("keydown", (ev) => {
+    if (ev.key === "r" || ev.key === "R") {
+        if (document.getElementById("dailyTab").classList.contains("active")) {
+            if (dChart && dChart.resetZoom) dChart.resetZoom();
+        } else if (document.getElementById("intradayTab").classList.contains("active")) {
+            if (iChart && iChart.resetZoom) iChart.resetZoom();
+        }
+    }
+});
+
+</script>
 
 </body>
 </html>
