@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSE Stock Tracker by Eshan Patel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+        }
+        header, footer {
+            background: #1e3a8a;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .container {
+            width: 95%;
+            margin: 10px auto;
+        }
+        .row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 8px;
+            font-size: 16px;
+        }
+        button {
+            padding: 8px 16px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .status {
+            flex: 1;
+            background: #e0e7ff;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: #cbd5e1;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            background: #e2e8f0;
+            font-weight: bold;
+        }
+        .tab.active {
+            background: white;
+            border-bottom: 3px solid #1e3a8a;
+        }
+        .tab-content {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+        .json-box, .table-content {
+            height: 150px;
+            border: 1px dashed #999;
+            padding: 10px;
+            background: #fafafa;
+            overflow-y: auto;
+            border-radius: 4px;
+            font-family: monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #666;
+        }
+    </style>
+    <script>
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+
+            document.getElementById(tabName).style.display = 'block';
+            document.getElementById('tab-' + tabName).classList.add('active');
+        }
+
+        window.onload = () => {
+            showTab('debug');
+        };
+            function fetchSample() {
+            const sample = {
+                info: {symbol: "RELIANCE", name: "Reliance Industries", sector: "Energy"},
+                daily: [
+                    {date: "2025-11-14", open: 2510, close: 2532},
+                    {date: "2025-11-15", open: 2532, close: 2540}
+                ],
+                intraday: [
+                    {time: "10:00", price: 2530},
+                    {time: "10:05", price: 2533}
+                ],
+                balance: [
+                    {year: 2023, assets: 100000, liabilities: 45000}
+                ],
+                cashflow: [
+                    {year: 2023, operating: 23000, investing: -12000}
+                ]
+            };
+
+            document.querySelector('.json-box').textContent = JSON.stringify(sample, null, 4);
+            document.querySelector('.status').textContent = "Status: Loaded sample JSON";
+        }
+
+        window.onload = () => showTab('debug');
+            function renderTables(data) {
+            // INFO TABLE
+            let infoHTML = `<table border='1' width='100%' cellpadding='5'>
+                <tr><th>Key</th><th>Value</th></tr>`;
+            for (let k in data.info) infoHTML += `<tr><td>${k}</td><td>${data.info[k]}</td></tr>`;
+            infoHTML += `</table>`;
+            document.getElementById('info-table').innerHTML = infoHTML;
+
+            // DAILY TABLE
+            let dailyHTML = `<table border='1' width='100%' cellpadding='5'><tr>`;
+            Object.keys(data.daily[0]).forEach(h => dailyHTML += `<th>${h}</th>`);
+            dailyHTML += `</tr>`;
+            data.daily.forEach(r => {
+                dailyHTML += `<tr>`;
+                Object.values(r).forEach(v => dailyHTML += `<td>${v}</td>`);
+                dailyHTML += `</tr>`;
+            });
+            dailyHTML += `</table>`;
+            document.getElementById('daily-table').innerHTML = dailyHTML;
+
+            // INTRADAY TABLE
+            let intraHTML = `<table border='1' width='100%' cellpadding='5'><tr>`;
+            Object.keys(data.intraday[0]).forEach(h => intraHTML += `<th>${h}</th>`);
+            intraHTML += `</tr>`;
+            data.intraday.forEach(r => {
+                intraHTML += `<tr>`;
+                Object.values(r).forEach(v => intraHTML += `<td>${v}</td>`);
+                intraHTML += `</tr>`;
+            });
+            intraHTML += `</table>`;
+            document.getElementById('intraday-table').innerHTML = intraHTML;
+
+            // BALANCE
+            let balHTML = `<table border='1' width='100%' cellpadding='5'><tr>`;
+            Object.keys(data.balance[0]).forEach(h => balHTML += `<th>${h}</th>`);
+            balHTML += `</tr>`;
+            data.balance.forEach(r => {
+                balHTML += `<tr>`;
+                Object.values(r).forEach(v => balHTML += `<td>${v}</td>`);
+                balHTML += `</tr>`;
+            });
+            document.getElementById('balance-table').innerHTML = balHTML;
+
+            // CASHFLOW
+            let cfHTML = `<table border='1' width='100%' cellpadding='5'><tr>`;
+            Object.keys(data.cashflow[0]).forEach(h => cfHTML += `<th>${h}</th>`);
+            cfHTML += `</tr>`;
+            data.cashflow.forEach(r => {
+                cfHTML += `<tr>`;
+                Object.values(r).forEach(v => cfHTML += `<td>${v}</td>`);
+                cfHTML += `</tr>`;
+            });
+            document.getElementById('cashflow-table').innerHTML = cfHTML;
+        }
+
+        function fetchSample() {
+            const sample = {
+                info: {symbol: "RELIANCE", name: "Reliance Industries", sector: "Energy"},
+                daily: [
+                    {date: "2025-11-14", open: 2510, close: 2532},
+                    {date: "2025-11-15", open: 2532, close: 2540}
+                ],
+                intraday: [
+                    {time: "10:00", price: 2530},
+                    {time: "10:05", price: 2533}
+                ],
+                balance: [
+                    {year: 2023, assets: 100000, liabilities: 45000}
+                ],
+                cashflow: [
+                    {year: 2023, operating: 23000, investing: -12000}
+                ]
+            };
+
+            document.querySelector('.json-box').textContent = JSON.stringify(sample, null, 4);
+            document.querySelector('.status').textContent = "Status: Loaded sample JSON";
+
+            renderTables(sample);
+        }
+    </script>
+</head>
+<body>
+
+<header>NSE Stock Tracker by Eshan Patel</header>
+
+<div class="container">
+    <div class="row">
+        <input type="text" placeholder="Enter Stock Symbol (e.g. RELIANCE)">
+        <button onclick="fetchSample()">Fetch</button>
+        <div class="status">Status: Waiting...</div>
+    </div>
+
+    <!-- Tab Buttons -->
+    <div class="tabs">
+        <div class="tab active" id="tab-debug" onclick="showTab('debug')">Debug</div>
+        <div class="tab" id="tab-info" onclick="showTab('info')">Info</div>
+        <div class="tab" id="tab-daily" onclick="showTab('daily')">Daily</div>
+        <div class="tab" id="tab-intraday" onclick="showTab('intraday')">Intraday</div>
+        <div class="tab" id="tab-balance" onclick="showTab('balance')">Balance Sheet</div>
+        <div class="tab" id="tab-cashflow" onclick="showTab('cashflow')">Cashflow</div>
+    </div>
+
+    <!-- Tab Contents -->
+    <div class="tab-content" id="debug">
+        <div class="json-box">{
+    "info": {"symbol": "RELIANCE", "name": "Reliance Industries", "sector": "Energy"},
+    "daily": [
+        {"date": "2025-11-14", "open": 2510, "close": 2532},
+        {"date": "2025-11-15", "open": 2532, "close": 2540}
+    ],
+    "intraday": [
+        {"time": "10:00", "price": 2530},
+        {"time": "10:05", "price": 2533}
+    ],
+    "balance": [
+        {"year": 2023, "assets": 100000, "liabilities": 45000}
+    ],
+    "cashflow": [
+        {"year": 2023, "operating": 23000, "investing": -12000}
+    ]
+}...</div>
+    </div>
+
+    <div class="tab-content" id="info" style="display:none;">
+        <div class="table-placeholder"><div id='info-table'>No data</div>...</div>
+    </div>
+
+    <div class="tab-content" id="daily" style="display:none;">
+        <div class="table-placeholder"><div id='daily-table'>No data</div>...</div>
+    </div>
+
+    <div class="tab-content" id="intraday" style="display:none;">
+        <div class="table-placeholder"><div id='intraday-table'>No data</div>...</div>
+    </div>
+
+    <div class="tab-content" id="balance" style="display:none;">
+        <div class="table-placeholder"><div id='balance-table'>No data</div>...</div>
+    </div>
+
+    <div class="tab-content" id="cashflow" style="display:none;">
+        <div class="table-placeholder"><div id='cashflow-table'>No data</div>...</div>
+    </div>
+</div>
+
+<footer>© 2025 Eshan Patel | Static Layout</footer>
+
+</body>
+</html>
