@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>NSE Stock Tracker by Eshan Patel</title>
+<style>
+    body { margin:0; font-family: Arial, Helvetica, sans-serif; height:100vh; display:flex; flex-direction:column; background:#0b1220; color:#ddd; }
+    header, footer { background:#0f1720; color:#fff; padding:10px; text-align:center; position:sticky; z-index:10; }
+    header { top:0; }
+    footer { bottom:0; }
+    #content { flex:1; overflow:auto; padding:12px; }
+    .row { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+    .tabBar { display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+    .tab { padding:8px 12px; background:#222; cursor:pointer; border-radius:4px; color:#ddd; user-select:none; }
+    .tab.active { background:#0b75d1; color:white; }
+    .section { display:none; }
+    .section.active { display:block; }
+    table { width:100%; border-collapse:collapse; margin-bottom:20px; background:#071020; color:#ddd; }
+    th, td { border:1px solid #223; padding:6px; text-align:left; }
+    pre { background:#000; color:#0f0; padding:10px; overflow:auto; height:300px; white-space:pre-wrap; word-break:break-word; }
+    .scrollBox { max-height:400px; overflow:auto; border:1px solid #223; margin-bottom:20px; background:#071020; padding:6px; }
+    select[multiple] { height:100px; }
+    .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    input, select, button { padding:6px; border-radius:4px; border:1px solid #334; background:#0b1622; color:#ddd; }
+    button { cursor:pointer; background:#0b75d1; border:none; color:white; }
+    #statusBox { font-weight:600; }
+    .chartWrapper { display:flex; flex-direction:column; gap:8px; }
+    .plotlyChart { width:100%; background:#071020; border:1px solid #223; }
+    .chartMain { height: 360px; }
+    .chartVol  { height: 120px; }
+    @media (max-width:700px) {
+        .row { flex-direction:column; align-items:stretch; }
+    }
+    .small { font-size:0.9em; padding:5px 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h2>NSE Stock Tracker — Eshan Patel</h2>
+</header>
+
+<div id="content">
+
+  <!-- SYMBOL + START/END + FETCH -->
+  <div class="row">
+      <input id="symbol" placeholder="Symbol (e.g. RELIANCE.NS)" style="flex:1;">
+      <input id="startDate" placeholder="Start (dd-mm-yyyy)" style="flex:1;">
+      <input id="endDate" placeholder="End (dd-mm-yyyy)" style="flex:1;">
+      <button id="fetchBtn">Fetch</button>
+      <div id="statusBox" style="flex:1; text-align:center;">Status: Idle</div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabBar">
+      <div class="tab active" data-tab="debugTab">Debug</div>
+      <div class="tab" data-tab="infoTab">Info</div>
+      <div class="tab" data-tab="resultsTab">Results</div>
+      <div class="tab" data-tab="balanceTab">Balance Sheet</div>
+      <div class="tab" data-tab="cashflowTab">Cashflow</div>
+      <div class="tab" data-tab="dailyTab">Daily</div>
+      <div class="tab" data-tab="intradayTab">Intraday</div>
+  </div>
+
+  <!-- SECTIONS -->
+  <div id="debugTab" class="section active">
+      <pre id="debugBox">(empty)</pre>
+  </div>
+
+  <div id="infoTab" class="section"><div id="info"></div></div>
+  <div id="resultsTab" class="section"><div id="results"></div></div>
+  <div id="balanceTab" class="section"><div id="balance"></div></div>
+  <div id="cashflowTab" class="section"><div id="cashflow"></div></div>
+
+  <!-- DAILY SECTION (Plotly) -->
+  <div id="dailyTab" class="section">
+      <div class="row controls">
+          <label class="small">Chart style:</label>
+          <select id="dailyChartStyle" class="small">
+              <option value="A">A — TradingView style (price + volume subplot)</option>
+              <option value="B">B — Single combined (overlay)</option>
+              <option value="C">C — Three separate charts</option>
+          </select>
+
+          <label class="small">Chart type:</label>
+          <select id="dailyChartType" class="small">
+              <option value="candlestick">Candlestick</option>
+              <option value="line">Line</option>
+          </select>
+
+          <select id="dailyIndicator" multiple class="small">
+              <option value="sma">SMA (14)</option>
+              <option value="ema">EMA (14)</option>
+              <option value="rsi">RSI (14)</option>
+              <option value="macd">MACD (12,26,9)</option>
+          </select>
+
+          <button id="applyDaily" class="small">Apply</button>
+          <button id="resetDaily" class="small">Reset Zoom</button>
+      </div>
+
+      <div id="dailyPlotContainer" class="chartWrapper">
+        <div id="plotly_daily_A" class="plotlyChart" style="display:none;">
+            <div id="plotly_daily_A_div" class="chartMain"></div>
+        </div>
+        <div id="plotly_daily_B" class="plotlyChart" style="display:none;">
+            <div id="plotly_daily_B_div" class="chartMain"></div>
+        </div>
+        <div id="plotly_daily_C" class="plotlyChart" style="display:none;">
+            <div id="plotly_daily_C_price" class="chartMain"></div>
+            <div id="plotly_daily_C_indicators" class="chartVol" style="height:160px;"></div>
+            <div id="plotly_daily_C_vol" class="chartVol"></div>
+        </div>
+      </div>
+
+      <div class="scrollBox">
+          <div id="daily"></div>
+      </div>
+  </div>
+
+  <!-- INTRADAY SECTION (Plotly) -->
+  <div id="intradayTab" class="section">
+      <div class="row controls">
+          <label class="small">Chart style:</label>
+          <select id="intraChartStyle" class="small">
+              <option value="A">A — TradingView style (price + volume subplot)</option>
+              <option value="B">B — Single combined (overlay)</option>
+              <option value="C">C — Three separate charts</option>
+          </select>
+
+          <label class="small">Chart type:</label>
+          <select id="intradayChartType" class="small">
+              <option value="candlestick">Candlestick</option>
+              <option value="line">Line</option>
+          </select>
+
+          <select id="intradayIndicator" multiple class="small">
+              <option value="sma">SMA (14)</option>
+              <option value="ema">EMA (14)</option>
+              <option value="rsi">RSI (14)</option>
+              <option value="macd">MACD (12,26,9)</option>
+          </select>
+
+          <button id="applyIntra" class="small">Apply</button>
+          <button id="resetIntra" class="small">Reset Zoom</button>
+      </div>
+
+      <div id="intraPlotContainer" class="chartWrapper">
+        <div id="plotly_intra_A" class="plotlyChart" style="display:none;">
+            <div id="plotly_intra_A_div" class="chartMain"></div>
+        </div>
+        <div id="plotly_intra_B" class="plotlyChart" style="display:none;">
+            <div id="plotly_intra_B_div" class="chartMain"></div>
+        </div>
+        <div id="plotly_intra_C" class="plotlyChart" style="display:none;">
+            <div id="plotly_intra_C_price" class="chartMain"></div>
+            <div id="plotly_intra_C_indicators" class="chartVol" style="height:160px;"></div>
+            <div id="plotly_intra_C_vol" class="chartVol"></div>
+        </div>
+      </div>
+
+      <div class="scrollBox">
+          <div id="intraday"></div>
+      </div>
+  </div>
+
+</div>
+
+<footer>
+  <p>© 2025 Eshan Patel</p>
+</footer>
+
+<!-- Plotly -->
+<script src="https://cdn.plot.ly/plotly-2.25.1.min.js"></script>
+
+<!-- TechnicalIndicators ESM: load and attach to window.ti -->
+<script type="module">
+import * as ti from "https://cdn.jsdelivr.net/npm/technicalindicators@3.1.0/dist/browser.esm.min.js";
+window.ti = ti;
+console.log("TI loaded:", !!window.ti);
+</script>
+
+<!-- Main script (uses api.js fetchStockData) -->
+<script type="module">
+import { fetchStockData } from "./api.js";
+
+/* -------------------------
+   Global state variables
+   ------------------------- */
+let globalDaily = [];
+let globalIntraday = [];
+
+/* -------------------------
+   Helpers (tolerant parsing / table helpers)
+   ------------------------- */
+function pick(obj, keys) {
+    if (!obj) return null;
+    for (let k of keys) if (k in obj && obj[k] != null) return obj[k];
+    return null;
+}
+
+function tableFromObject(obj) {
+    if (!obj) return "No data";
+    let html = "<table>";
+    for (let k in obj) html += `<tr><th>${k}</th><td>${String(obj[k])}</td></tr>`;
+    return html + "</table>";
+}
+
+function tableFromArray(arr) {
+    if (!arr || arr.length === 0) return "No data";
+    const keys = Object.keys(arr[0] || {});
+    let html = "<table><tr>";
+    keys.forEach(k => html += `<th>${k}</th>`);
+    html += "</tr>";
+    arr.forEach(row => {
+        html += "<tr>";
+        keys.forEach(k => html += `<td>${String(row[k] ?? "")}</td>`);
+        html += "</tr>";
+    });
+    return html + "</table>";
+}
+
+function normalizeLabelForAxis(raw, preferDate = true) {
+    if (!raw && raw !== 0) return "";
+    const s = String(raw).trim();
+    if (/^\d{10}$/.test(s)) return (new Date(Number(s) * 1000)).toISOString();
+    if (/^\d{13}$/.test(s)) return (new Date(Number(s))).toISOString();
+    const dmy = s.match(/^(\d{2})-(\d{2})-(\d{4})/);
+    if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+    const iso = s.match(/(\d{4}-\d{2}-\d{2})(?:[T\s](\d{2}:\d{2}(?::\d{2})?)?)?/);
+    if (iso) {
+        if (preferDate && !iso[2]) return iso[1];
+        return iso[2] ? `${iso[1]} ${iso[2]}` : iso[1];
+    }
+    return s;
+}
+
+/* -------------------------
+   Build OHLCV arrays tolerant to various keys
+   ------------------------- */
+function buildOHLCV(data) {
+    const rawLabels = data.map(x => (x.date ?? x.Date ?? x.datetime ?? x.time ?? x.t ?? "").toString());
+    const isIntraday = rawLabels.some(r => /:\d{2}/.test(String(r))) && rawLabels.filter(r => /\d{4}-\d{2}-\d{2}/.test(String(r))).length < rawLabels.length * 0.6;
+    const x = rawLabels.map(raw => {
+        if (isIntraday) {
+            const m = String(raw).match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+            return m ? m[0].padStart(8, "0") : normalizeLabelForAxis(raw, false);
+        }
+        return normalizeLabelForAxis(raw, true) || raw;
+    });
+    const o = data.map(row => Number(row.open ?? row.Open ?? row.O ?? row.o ?? NaN));
+    const h = data.map(row => Number(row.high ?? row.High ?? row.H ?? row.h ?? NaN));
+    const l = data.map(row => Number(row.low  ?? row.Low  ?? row.L ?? row.l ?? NaN));
+    const c = data.map(row => Number(row.close ?? row.Close ?? row.C ?? row.c ?? NaN));
+    const v = data.map(row => Number(row.volume ?? row.Volume ?? row.V ?? 0));
+    return { x, o, h, l, c, v, rawLabels };
+}
+
+/* -------------------------
+   Indicator computations via technicalindicators
+   ------------------------- */
+function computeIndicatorsPlotly(closeArr, indicatorList) {
+    const out = {};
+    if (!window.ti) return out;
+    try {
+        if (indicatorList.includes("sma")) out.sma = window.ti.SMA.calculate({ period: 14, values: closeArr });
+        if (indicatorList.includes("ema")) out.ema = window.ti.EMA.calculate({ period: 14, values: closeArr });
+        if (indicatorList.includes("rsi")) out.rsi = window.ti.RSI.calculate({ period: 14, values: closeArr });
+        if (indicatorList.includes("macd")) out.macd = window.ti.MACD.calculate({ fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, values: closeArr });
+    } catch (e) {
+        console.warn("Indicator compute error:", e);
+    }
+    return out;
+}
+
+function padLeft(arr, targetLen) {
+    if (!arr) return Array(targetLen).fill(null);
+    const padLen = targetLen - arr.length;
+    if (padLen <= 0) return arr.slice(-targetLen);
+    return Array(padLen).fill(null).concat(arr);
+}
+
+/* -------------------------
+   Plotly renderers (A, B, C)
+   ------------------------- */
+
+function renderPlotly_A(baseId, data, chartType, indicatorsCsv) {
+    const containerId = `plotly_${baseId}_A_div`;
+    const container = document.getElementById(containerId);
+    Plotly.purge(container);
+
+    const { x, o, h, l, c, v, rawLabels } = buildOHLCV(data);
+    const indicatorList = indicatorsCsv ? indicatorsCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
+    const ind = computeIndicatorsPlotly(c, indicatorList);
+
+    const traces = [];
+
+    if (chartType === "candlestick") {
+        traces.push({
+            x, open: o, high: h, low: l, close: c,
+            type: 'candlestick', name: 'Price',
+            increasing: { line: { color: '#00a86b' } }, decreasing: { line: { color: '#ff4d4f' } }
+        });
+    } else {
+        traces.push({ x, y: c, type: 'scatter', mode: 'lines', name: 'Close' });
+    }
+
+    if (ind.sma) traces.push({ x, y: padLeft(ind.sma, x.length), type: 'scatter', mode: 'lines', name: 'SMA(14)', line: { width: 1 } });
+    if (ind.ema) traces.push({ x, y: padLeft(ind.ema, x.length), type: 'scatter', mode: 'lines', name: 'EMA(14)', line: { width: 1, dash: 'dash' } });
+
+    traces.push({
+        x, y: v, type: 'bar', name: 'Volume',
+        marker: { color: v.map((_,i) => (c[i] >= o[i] ? 'rgba(26,200,120,0.6)' : 'rgba(255,80,80,0.6)')) },
+        yaxis: 'y2'
+    });
+
+    const layout = {
+        grid: { rows: 2, columns: 1, roworder: 'top to bottom', heights: [0.75, 0.25] },
+        margin: { t: 30, r: 40, b: 40, l: 40 },
+        xaxis: { rangeslider: { visible: false }, showticklabels: true },
+        yaxis: { domain: [0.32, 1], autorange: true },
+        yaxis2: { domain: [0, 0.22], autorange: true, title: 'Volume' },
+        template: 'plotly_dark',
+        showlegend: true
+    };
+
+    Plotly.newPlot(container, traces, layout, { displayModeBar: true }).catch(e => console.warn(e));
+}
+
+function renderPlotly_B(baseId, data, chartType, indicatorsCsv) {
+    const container = document.getElementById(`plotly_${baseId}_B_div`);
+    Plotly.purge(container);
+
+    const { x, o, h, l, c, v } = buildOHLCV(data);
+    const indicatorList = indicatorsCsv ? indicatorsCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
+    const ind = computeIndicatorsPlotly(c, indicatorList);
+
+    const traces = [];
+
+    if (chartType === "candlestick") {
+        traces.push({
+            x, open: o, high: h, low: l, close: c,
+            type: 'candlestick', name: 'Price',
+            increasing: { line: { color: '#00a86b' } }, decreasing: { line: { color: '#ff4d4f' } }
+        });
+    } else {
+        traces.push({ x, y: c, type: 'scatter', mode: 'lines', name: 'Close' });
+    }
+
+    if (ind.sma) traces.push({ x, y: padLeft(ind.sma, x.length), type: 'scatter', mode: 'lines', name: 'SMA(14)' });
+    if (ind.ema) traces.push({ x, y: padLeft(ind.ema, x.length), type: 'scatter', mode: 'lines', name: 'EMA(14)', line: { dash: 'dash' } });
+
+    traces.push({
+        x, y: v, type: 'bar', name: 'Volume', yaxis: 'y2',
+        marker: { color: v.map((_,i) => (c[i] >= o[i] ? 'rgba(26,200,120,0.18)' : 'rgba(255,80,80,0.18)')) }
+    });
+
+    const layout = {
+        margin: { t: 30, r: 40, b: 40, l: 40 },
+        xaxis: { rangeslider: { visible: false } },
+        yaxis: { domain: [0.15, 1], autorange: true },
+        yaxis2: { domain: [0, 0.12], overlaying: 'y', showgrid: false, autorange: true },
+        template: 'plotly_dark',
+        showlegend: true
+    };
+
+    Plotly.newPlot(container, traces, layout, { displayModeBar: true }).catch(e => console.warn(e));
+}
+
+function renderPlotly_C(baseId, data, chartType, indicatorsCsv) {
+    const priceDiv = document.getElementById(`plotly_${baseId}_C_price`);
+    const indDiv   = document.getElementById(`plotly_${baseId}_C_indicators`);
+    const volDiv   = document.getElementById(`plotly_${baseId}_C_vol`);
+    Plotly.purge(priceDiv); Plotly.purge(indDiv); Plotly.purge(volDiv);
+
+    const { x, o, h, l, c, v } = buildOHLCV(data);
+    const indicatorList = indicatorsCsv ? indicatorsCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
+    const ind = computeIndicatorsPlotly(c, indicatorList);
+
+    // Price
+    const priceTraces = [];
+    if (chartType === "candlestick") priceTraces.push({ x, open: o, high: h, low: l, close: c, type: 'candlestick', name: 'Price' });
+    else priceTraces.push({ x, y: c, type: 'scatter', mode: 'lines', name: 'Close' });
+
+    Plotly.newPlot(priceDiv, priceTraces, { margin: { t: 10, b: 30, l: 40, r: 40 }, template: 'plotly_dark', xaxis: { rangeslider: { visible: false } } }, { displayModeBar: true }).catch(e => console.warn(e));
+
+    // Indicators (RSI/MACD/SMA/EMA)
+    const indTraces = [];
+    if (ind.sma) indTraces.push({ x, y: padLeft(ind.sma, x.length), type: 'scatter', mode: 'lines', name: 'SMA(14)' });
+    if (ind.ema) indTraces.push({ x, y: padLeft(ind.ema, x.length), type: 'scatter', mode: 'lines', name: 'EMA(14)', line: { dash: 'dash' } });
+    if (ind.rsi) indTraces.push({ x, y: padLeft(ind.rsi, x.length), type: 'scatter', mode: 'lines', name: 'RSI(14)' });
+
+    if (ind.macd && Array.isArray(ind.macd) && ind.macd.length > 0) {
+        // technicalindicators returns objects like {MACD, signal, histogram}
+        const macdVals = ind.macd.map(m => m ? (m.MACD ?? m.MACD) : null);
+        const macdSignal = ind.macd.map(m => m ? (m.signal ?? m.Signal) : null);
+        const macdHist = ind.macd.map(m => m ? (m.histogram ?? m.Histogram ?? m.hist) : null);
+        indTraces.push({ x, y: padLeft(macdVals, x.length), type: 'scatter', mode: 'lines', name: 'MACD' });
+        indTraces.push({ x, y: padLeft(macdSignal, x.length), type: 'scatter', mode: 'lines', name: 'MACD Signal', line: { dash: 'dash' } });
+        indTraces.push({ x, y: padLeft(macdHist, x.length), type: 'bar', name: 'MACD Hist' });
+    }
+
+    if (indTraces.length === 0) indTraces.push({ x, y: Array(x.length).fill(null), type: 'scatter', mode: 'lines', name: '(no indicators selected)' });
+
+    Plotly.newPlot(indDiv, indTraces, { margin: { t: 10, b: 30, l: 40, r: 40 }, template: 'plotly_dark' }, { displayModeBar: true }).catch(e => console.warn(e));
+
+    // Volume
+    const volTrace = { x, y: v, type: 'bar', name: 'Volume', marker: { color: v.map((_,i) => (c[i] >= o[i] ? 'rgba(26,200,120,0.6)' : 'rgba(255,80,80,0.6)')) } };
+    Plotly.newPlot(volDiv, [volTrace], { margin: { t: 10, b: 30, l: 40, r: 40 }, template: 'plotly_dark', showlegend: false }, { displayModeBar: true }).catch(e => console.warn(e));
+
+    // Sync x-axis across the three plots
+    const sync = (src, targets) => {
+        src.on('plotly_relayout', (ev) => {
+            // look for xaxis.range[0]/[1] or xaxis.range
+            const update = {};
+            if (ev['xaxis.range[0]'] && ev['xaxis.range[1]']) update['xaxis.range'] = [ev['xaxis.range[0]'], ev['xaxis.range[1]']];
+            else if (ev['xaxis.range']) update['xaxis.range'] = ev['xaxis.range'];
+            else return;
+            targets.forEach(t => Plotly.relayout(t, update).catch(()=>{}));
+        });
+    };
+    sync(priceDiv, [indDiv, volDiv]);
+    sync(indDiv, [priceDiv, volDiv]);
+    sync(volDiv, [priceDiv, indDiv]);
+}
+
+/* -------------------------
+   UI wiring (tabs, apply/reset)
+   ------------------------- */
+document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", (ev) => {
+        const id = ev.currentTarget.dataset.tab;
+        document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+        document.getElementById(id).classList.add("active");
+        document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+        ev.currentTarget.classList.add("active");
+    });
+});
+
+function getSelectedOptionsCsv(selectElem) {
+    return Array.from(selectElem.selectedOptions).map(o => o.value).join(",");
+}
+
+/* -------------------------
+   Fetch handler (fills globals and renders)
+   ------------------------- */
+document.getElementById("fetchBtn").addEventListener("click", async () => {
+    const symbol = document.getElementById("symbol").value.trim();
+    const sd = document.getElementById("startDate").value.trim();
+    const ed = document.getElementById("endDate").value.trim();
+    if (!symbol) return alert("Enter symbol");
+    document.getElementById("statusBox").innerText = "Status: Fetching...";
+
+    try {
+        // Keep API signature: fetchStockData(symbol, "NSE") or (symbol, sd, ed) depending on your api.js
+        // Try calling few ways to be tolerant
+        let data;
+        try { data = await fetchStockData(symbol, "NSE"); } catch(e) {
+            try { data = await fetchStockData(symbol, sd, ed); } catch(e2) { throw e2; }
+        }
+
+        document.getElementById("debugBox").textContent = JSON.stringify({ keys: Object.keys(data || {}), sample: Object.keys(data || {}).slice(0,10) }, null, 2);
+        document.getElementById("statusBox").innerText = "Status: Success";
+
+        // fill UI tables (tolerant key checks)
+        const info = pick(data, ["info", "info_data", "details"]) || {};
+        document.getElementById("info").innerHTML = tableFromObject(info);
+
+        const qRes = pick(data.financials || {}, ["quarterly", "Quarterly"]) || [];
+        const yRes = pick(data.financials || {}, ["yearly", "Yearly"]) || [];
+        document.getElementById("results").innerHTML = tableFromArray(qRes) + "<br>" + tableFromArray(yRes);
+
+        const bal = pick(data, ["balance_sheet", "balanceSheet"]) || {};
+        document.getElementById("balance").innerHTML = tableFromArray(bal.quarterly || []) + "<br>" + tableFromArray(bal.yearly || []);
+
+        const cash = pick(data, ["cashflow", "cashFlow"]) || {};
+        document.getElementById("cashflow").innerHTML = tableFromArray(cash.quarterly || []) + "<br>" + tableFromArray(cash.yearly || []);
+
+        // globals: normalize different possible keys
+        globalDaily = pick(data, ["historical_daily", "daily_history", "daily", "daily_data"]) || [];
+        globalIntraday = pick(data, ["intraday_5min", "intraday", "intraday_1m", "intradayData"]) || [];
+
+        document.getElementById("daily").innerHTML = tableFromArray(globalDaily);
+        document.getElementById("intraday").innerHTML = tableFromArray(globalIntraday);
+
+        // Render charts based on current UI selections
+        try {
+            // DAILY
+            const dailyStyle = document.getElementById("dailyChartStyle").value || 'A';
+            const dailyType  = document.getElementById("dailyChartType").value || 'candlestick';
+            const dailyIndic = getSelectedOptionsCsv(document.getElementById("dailyIndicator"));
+            ['plotly_daily_A','plotly_daily_B','plotly_daily_C'].forEach(id => document.getElementById(id).style.display='none');
+            if (globalDaily && globalDaily.length > 0) {
+                document.getElementById(`plotly_daily_${dailyStyle}`).style.display = 'block';
+                if (dailyStyle === 'A') renderPlotly_A('daily', globalDaily, dailyType, dailyIndic);
+                else if (dailyStyle === 'B') renderPlotly_B('daily', globalDaily, dailyType, dailyIndic);
+                else renderPlotly_C('daily', globalDaily, dailyType, dailyIndic);
+            }
+
+            // INTRADAY
+            const intraStyle = document.getElementById("intraChartStyle").value || 'A';
+            const intraType  = document.getElementById("intradayChartType").value || 'candlestick';
+            const intraIndic = getSelectedOptionsCsv(document.getElementById("intradayIndicator"));
+            ['plotly_intra_A','plotly_intra_B','plotly_intra_C'].forEach(id => document.getElementById(id).style.display='none');
+            if (globalIntraday && globalIntraday.length > 0) {
+                document.getElementById(`plotly_intra_${intraStyle}`).style.display = 'block';
+                if (intraStyle === 'A') renderPlotly_A('intra', globalIntraday, intraType, intraIndic);
+                else if (intraStyle === 'B') renderPlotly_B('intra', globalIntraday, intraType, intraIndic);
+                else renderPlotly_C('intra', globalIntraday, intraType, intraIndic);
+            }
+
+        } catch (e) {
+            console.warn("Plotly render error:", e);
+        }
+
+    } catch (err) {
+        document.getElementById("statusBox").innerText = "Status: ERROR";
+        document.getElementById("debugBox").textContent = String(err);
+        console.error(err);
+    }
+});
+
+/* -------------------------
+   Apply/Reset handlers
+   ------------------------- */
+document.getElementById("applyDaily").addEventListener("click", () => {
+    const style = document.getElementById("dailyChartStyle").value;
+    const type  = document.getElementById("dailyChartType").value;
+    const indic = getSelectedOptionsCsv(document.getElementById("dailyIndicator"));
+    ['plotly_daily_A','plotly_daily_B','plotly_daily_C'].forEach(id => document.getElementById(id).style.display='none');
+    document.getElementById(`plotly_daily_${style}`).style.display = 'block';
+    if (globalDaily && globalDaily.length > 0) {
+        if (style === 'A') renderPlotly_A('daily', globalDaily, type, indic);
+        else if (style === 'B') renderPlotly_B('daily', globalDaily, type, indic);
+        else renderPlotly_C('daily', globalDaily, type, indic);
+    }
+});
+
+document.getElementById("resetDaily").addEventListener("click", () => {
+    ['plotly_daily_A_div','plotly_daily_B_div','plotly_daily_C_price','plotly_daily_C_indicators','plotly_daily_C_vol'].forEach(id => {
+        const el = document.getElementById(id); if (el) Plotly.relayout(el, { 'xaxis.autorange': true }).catch(()=>{});
+    });
+});
+
+document.getElementById("applyIntra").addEventListener("click", () => {
+    const style = document.getElementById("intraChartStyle").value;
+    const type  = document.getElementById("intradayChartType").value;
+    const indic = getSelectedOptionsCsv(document.getElementById("intradayIndicator"));
+    ['plotly_intra_A','plotly_intra_B','plotly_intra_C'].forEach(id => document.getElementById(id).style.display='none');
+    document.getElementById(`plotly_intra_${style}`).style.display = 'block';
+    if (globalIntraday && globalIntraday.length > 0) {
+        if (style === 'A') renderPlotly_A('intra', globalIntraday, type, indic);
+        else if (style === 'B') renderPlotly_B('intra', globalIntraday, type, indic);
+        else renderPlotly_C('intra', globalIntraday, type, indic);
+    }
+});
+
+document.getElementById("resetIntra").addEventListener("click", () => {
+    ['plotly_intra_A_div','plotly_intra_B_div','plotly_intra_C_price','plotly_intra_C_indicators','plotly_intra_C_vol'].forEach(id => {
+        const el = document.getElementById(id); if (el) Plotly.relayout(el, { 'xaxis.autorange': true }).catch(()=>{});
+    });
+});
+
+/* Keyboard R to reset zoom for active tab */
+document.addEventListener("keydown", (ev) => {
+    if (ev.key === "r" || ev.key === "R") {
+        if (document.getElementById("dailyTab").classList.contains("active")) {
+            ['plotly_daily_A_div','plotly_daily_B_div','plotly_daily_C_price','plotly_daily_C_indicators','plotly_daily_C_vol'].forEach(id => {
+                const el = document.getElementById(id); if (el) Plotly.relayout(el, { 'xaxis.autorange': true }).catch(()=>{});
+            });
+        } else if (document.getElementById("intradayTab").classList.contains("active")) {
+            ['plotly_intra_A_div','plotly_intra_B_div','plotly_intra_C_price','plotly_intra_C_indicators','plotly_intra_C_vol'].forEach(id => {
+                const el = document.getElementById(id); if (el) Plotly.relayout(el, { 'xaxis.autorange': true }).catch(()=>{});
+            });
+        }
+    }
+});
+</script>
+
+</body>
+</html>
